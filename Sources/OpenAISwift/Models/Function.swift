@@ -1,4 +1,4 @@
-public enum JSONType: String {
+public enum JSONType: String, Encodable {
     case array
     case string
     case number
@@ -6,50 +6,54 @@ public enum JSONType: String {
     case object
 }
 
+public enum Format: String, Encodable {
+    case dateTime = "date-time"
+    case time, date
+    case partialTime = "partial-time"
+}
+
 public struct Function: Encodable {
     public let name: String
     public let description: String
-    public let parameters: Parameters
+    public let parameters: Property
 
-    public init(name: String, description: String, parameters: Parameters) {
+    public init(name: String, description: String, properties: [String: Property], required: [String]? = nil) {
         self.name = name
         self.description = description
-        self.parameters = parameters
+        self.parameters = .init(type: .object, properties: properties, required: required)
     }
 }
 
-public struct Parameters: Encodable {
-    public let type: String
-    public let properties: [String: Property]
-    public let required: [String]
+public enum ReferOrProperty: Encodable {
+    case ref
+    case property(Property)
 
-    public init(type: JSONType = .object, properties: [String: Property], required: [String]) {
-        self.type = type.rawValue
-        self.properties = properties
-        self.required = required
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .ref:
+            try ["$ref": "#"].encode(to: encoder)
+        case .property(let property):
+            try property.encode(to: encoder)
+        }
     }
 }
 
-public struct Property: Encodable {
-    enum CodingKeys: String, CodingKey {
-        case type
-        case description
-        case format
-        case enumValues = "enum"
-        case items
-    }
-
-    public let type: String
-    public let items: Parameters?
+public class Property: Encodable {
+    public let type: JSONType
     public let description: String?
-    public let format: String?
-    public let enumValues: [String]?
+    public let format: Format?
+    public let `enum`: [String]?
+    public let items: ReferOrProperty?
+    public let properties: [String: Property]?
+    public let required: [String]?
 
-    public init(type: JSONType = .string, _ description: String?, format: String? = nil, enumValues: [String]? = nil, items: Parameters? = nil) {
-        self.type = type.rawValue
+    public init(type: JSONType, items: ReferOrProperty? = nil, description: String? = nil, format: Format? = nil, `enum`: [String]? = nil, properties: [String : Property]? = nil, required: [String]? = nil) {
+        self.type = type
+        self.items = items
         self.description = description
         self.format = format
-        self.enumValues = enumValues
-        self.items = items
+        self.`enum` = `enum`
+        self.properties = properties
+        self.required = required
     }
 }
